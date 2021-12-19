@@ -1,6 +1,8 @@
 const mysql = require('mysql2/promise');
-/* const dotenv = require('dotenv');
-const jwt = require('jsonwebtoken'); */
+const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
+
+dotenv.config({path: 'src/.env'})
 
 async function connect(){
 
@@ -8,11 +10,11 @@ async function connect(){
         return global.connection;
 
     const connection = await mysql.createConnection({
-        host: '127.0.0.1',
-        port: '3306',
-        user: 'root',
-        password: '#Password123',
-        database:'inventory'
+        host: process.env.DATABASE_HOST,
+        port: process.env.DATABASE_PORT,
+        user: process.env.DATABASE_USER,
+        password: process.env.DATABASE_PASSWORD,
+        database:process.env.DATABASE
     });
     console.log('conectou...');
     global.connection = connection;
@@ -47,6 +49,34 @@ async function removeStore(id){
     return conn.query(sql);
 }
 
+async function login(email, password){
+    
+    if(!email || !password){
+        return {message : 'Please, provide an email and password!'}
+    }
+
+    const conn = await connect();
+    const sql = `SELECT * FROM inventory.tbstore WHERE email = '${email}';`
+    
+    try {
+        const result = await conn.query(sql);
+        console.log(result[0][0]);
+        if(result.length == 0 || password != result[0][0].password){
+            return {message : 'Email or password is incorrect'}
+        } else {
+            const id = result[0][0].store_id;
+            const token = jwt.sign({ id }, process.env.JWT_SECRET, {
+                expiresIn : process.env.JWT_EXPIRES_IN
+            });
+
+            console.log(`The token is : ${token}`);
+            return { token, id }
+        }
+    } catch (error) {
+        throw error;
+    }
+}
+
 async function registerProduct(product) {
     const { product_name, product_image, minimum_quantity, current_quantity, section_id, store_id } = product;
 
@@ -67,4 +97,4 @@ async function registerSection(section) {
     return conn.query(sql, values);
 }
 
-module.exports = {registerStore,fetchStores,modifyStore,removeStore,registerProduct,registerSection}
+module.exports = {registerStore,fetchStores,modifyStore,removeStore,login,registerProduct,registerSection}
